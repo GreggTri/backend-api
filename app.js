@@ -3,12 +3,14 @@ const app = express()
 const mongoose = require('mongoose')
 const logger = require('morgan')
 require ('dotenv').config()
+const bodyParser = require('body-parser')
 
 //import routes
 const sellerRoute = require('./routes/sellers')
 const productRoute = require('./routes/products')
 
 app.use(express.json())
+app.use(express.urlencoded({ extended: true }));
 app.use(logger('dev'))
 
 //routes

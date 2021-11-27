@@ -2,26 +2,32 @@ const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
 const multer = require('multer');
-
-const storage = multer.diskStorage({
-  destination: function(req, file, cb) {
-    cb(null, './uploads/');
-  },
-  filename: function(req, file, cb) {
-    cb(null, file.originalname);
-  }
-});
-const fileFilter = (req, file, cb) => {
-  // reject a file
-  if (file.mimetype === 'image/jpg' || file.mimetype === 'image/jpeg' || file.mimetype === 'image/png') {
-    cb(null, true);
-  } else {
-    cb(null, false);
-  }
-};
-const uploadPicture = multer({ storage: storage, fileFilter: fileFilter})
+const multerS3 = require('multer-s3')
+const { v4 } = require('uuid')
+const uuid = v4
 const Product = require("../models/Product")
 const Seller = require('../models/Seller')
+const path = require('path')
+const { s3 } = require('../s3')
+
+var  uploadProduct = multer({
+  storage: multerS3({
+    s3,
+    bucket: process.env.AWS_BUCKET_NAME,
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    metadata: (req, file, cb) => {
+      cb(null, Object.assign({}, file.fieldname));
+    },
+    key: (req, file, cb) => {
+      const ext = path.extname(file.originalname)
+      const nameOfFile = path.parse(file.originalname).name
+      cb(null, `${file.fieldname + "_" + nameOfFile + "_" + uuid()}${ext}`)
+    }
+  })
+}).fields([
+  {name: 'productImage', maxCount: 1},
+  {name: 'model', maxCount: 6}
+  ])
 
 //******************************************************************************************************************
 //*********************************Seller-panel PRODUCT GET requests*********************************************
@@ -123,29 +129,66 @@ router.get("/:productId", (req, res, next) => {
 //*************************************Seller-panel Product POST request************************************
 
 //ADD's a product to a singular seller
-router.post("/:sellerId/addproduct", uploadPicture.single('productImage'), (req, res, next) => {
+router.post("/:sellerId/addproduct", uploadProduct, (req, res, next) => {
   const id = req.params.sellerId
   //To get seller branding and customer service data
   Seller.findById(id)
   .select('brandLogo brandName customerService')
   .exec()
   .then(doc => {
-    console.log("from database ", doc)
     if(doc){
       console.log("found Seller\'s branding & customer service info " + doc)
 
+      //declarations for arrays to get colorway information
+      const tempColorName = new Array()
+      const tempHexcode = new Array()
+      const tempModel = new Array()
+
+      //stores colorway info into separate arrays
+      for (const [key, value] of Object.entries(req.body)) {
+        if(key === "colorName"){
+          for(i = 0; i <= value.length - 1; i++){
+            tempColorName[i] = value[i]
+          }
+        }
+        else if(key === "hexcode"){
+          for(i = 0; i <= value.length - 1; i++){
+            tempHexcode[i] = value[i]
+          }
+        }
+        else {
+          //do nothing
+        }
+      }
+      //stores model keys into model array
+      for(i = 0; i <= req.files['model'].length - 1; i++){
+        tempModel[i] = req.files['model'][i].key
+
+      }
+
+      
+      let colorwayArray = [{
+        "colorName": "",
+        "hexcode": "",
+        "model": ""
+      }]
+      //adds all colorways into an array of objects
+      for(i = 0; i <= tempColorName.length - 1; i++){
+        colorwayArray[i] = {
+          "colorName": tempColorName[i],
+          "hexcode": tempHexcode[i],
+          "model": tempModel[i]
+        }
+      }
+      console.log(colorwayArray)
       //creates product with important seller data
       const product = new Product({
-        productImage: req.file.path,
+        productImage: req.files['productImage'][0].key,
         productName: req.body.productName,
         price: req.body.price,
         desc: req.body.desc,
         category: req.body.category,
-        colorway: [{
-          colorName: req.body.colorName,
-          hexcode: req.body.hexcode,
-          model: req.body.model
-        }],
+        colorway: colorwayArray,
         "seller.brand_id": id,
         "seller.brandLogo": doc.brandLogo,
         "seller.brandName": doc.brandName,
@@ -156,6 +199,7 @@ router.post("/:sellerId/addproduct", uploadPicture.single('productImage'), (req,
           warranty_policy: doc.customerService.warranty_policy
         } 
       })
+      console.log(product)
       product
       .save()
       .then(result => {
@@ -177,9 +221,12 @@ router.post("/:sellerId/addproduct", uploadPicture.single('productImage'), (req,
           }
         });
       })
+      .catch(err =>{
+        console.log(err)
+      })
     } else {
       res.status(404).json({
-        message: "No valid entry fround for provided ID"
+        message: "No valid entry found for provided ID"
       })
     }
   })
@@ -198,7 +245,7 @@ router.patch("/:productId", (req, res, next) => {
   for (const ops of req.body) {
     updateOps[ops.propName] = ops.value;
   }
-  Product.updateOne({ _id: id }, { $set: updateOps })
+  Product.updateOne({ _id: id }, { $set: updateOps }, {upsert: true, new: true})
     .exec()
     .then(result => {
       res.status(200).json({

@@ -18,10 +18,11 @@ const ProductSchema = new mongoose.Schema({
         },
     },
     colorway: [{
+        _id: false,
         colorName: {type: String, required: true},
         hexcode: {type: String, required: true},
         model: {type: String, require: true}
-    }, { _id : false }],
+    }],
     countInStock: {type: Number, default: 0},
 }, {timestamps: true} )
 
