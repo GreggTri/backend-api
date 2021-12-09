@@ -95,6 +95,7 @@ router.get("/:productId", (req, res, next) => {
       });
   });
 
+  //get all products from a seller
   router.get("/list-all/:sellerId", (req, res, next) => {
     const id = req.params.sellerId;
     Product.find({'seller.brand_id': id})
@@ -165,8 +166,6 @@ router.post("/:sellerId/addproduct", uploadProduct, (req, res, next) => {
         tempModel[i] = req.files['model'][i].key
 
       }
-
-      
       let colorwayArray = [{
         "colorName": "",
         "hexcode": "",
@@ -199,10 +198,17 @@ router.post("/:sellerId/addproduct", uploadProduct, (req, res, next) => {
           warranty_policy: doc.customerService.warranty_policy
         } 
       })
-      console.log(product)
       product
       .save()
       .then(result => {
+        Seller.updateOne({ _id: id }, {$inc: { numOfProducts: 1} }, {upsert: true, new: true})
+        .exec()
+        .then(results => {
+          console.log(results)
+        })
+        .catch(err => {
+          console.log(err)
+        })
         console.log(result);
         res.status(201).json({
           message: "Created product successfully",
@@ -238,7 +244,7 @@ router.post("/:sellerId/addproduct", uploadProduct, (req, res, next) => {
 
 //*************************************Seller-panel Product PATCH request************************************
 
-//TODO: edit product from seller
+//TODO:: Figure out how to switch out files in s3 bucket and update keys for them
 router.patch("/:productId", (req, res, next) => {
   const id = req.params.productId;
   const updateOps = {};
@@ -266,34 +272,75 @@ router.patch("/:productId", (req, res, next) => {
 
 //****************************************Seller-panel Product DELETE request********************************
 
-//TODO: DELETE product from seller 
-router.delete("/:productId", (req, res, next) => {
+//DELETE product from seller 
+router.delete("/:productId", async (req, res, next) => {
   const id = req.params.productId;
-  Product.deleteOne({ _id: id })
+  let keysToDelete = [{"Key": ''}]
+  let count = 0
+
+  var params = {
+    Bucket: process.env.AWS_BUCKET_NAME, 
+    Delete: {
+      Objects: [{
+          Key: ''
+      }],
+      Quiet: false
+    },
+  }
+  Product.findOneAndDelete({ _id: id })
+  .exec()
+  .then(deletedDoc => {
+    
+    keysToDelete[count] = { 
+      "Key": deletedDoc.productImage
+    }
+    count++
+
+    for(j = 0; j <= deletedDoc.colorway.length -1; j++){
+          
+      keysToDelete[count] = {
+        "Key": deletedDoc.colorway[j].model
+      }
+      count++
+    }
+    Seller.updateOne({"seller.brand_id": id }, {$inc: { numOfProducts: -1} })
     .exec()
-    .then(result => {
-      res.status(200).json({
-          message: 'Product deleted',
-          request: {
-              type: 'POST',
-              url: 'http://localhost:5000/products',
-              body: { name: 'String', price: 'Number' }
-          }
-      });
+    .then(results => {
+      console.log(results)
     })
     .catch(err => {
-      console.log(err);
-      res.status(500).json({
-        error: err
-      });
+      console.log(err)
+    })
+    return keysToDelete
+  })
+  .then(keys =>{
+    params.Delete.Objects = keys
+
+    //deletes keys of this product in s3 bucket
+    s3.deleteObjects(params, function(err, data) {
+      if (err){console.log(err, err.stack)} // an error occurred
+      else {console.log(data)}           // successful response
     });
+    res.status(200).json({
+      message: 'Product deleted from DB and s3',
+    });
+  })
+  .then(() => {
+    
+  })
+  .catch(err => {
+    console.log(err);
+    res.status(500).json({
+      error: err
+    });
+  });
 });
 
 //******************************************************************************************************************
 //*************************************APP CLIENT PRODUCT GET REQUESTS**********************************************
 //******************************************************************************************************************
 
-//TODO: get products that where most recently added
+//TODO: get products that were most recently added
 
 //TODO: get products that are most purchased
 

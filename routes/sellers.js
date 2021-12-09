@@ -98,7 +98,6 @@ router.get("/:sellerId", (req, res, next) => {
 
 router.post("/", uploadBrandLogo, (req, res, next) => {
 
-  console.log(req.file)
   const seller = new Seller({
       brandLogo: req.file.key,
       brandName: req.body.brandName,
@@ -139,13 +138,18 @@ router.post("/", uploadBrandLogo, (req, res, next) => {
 //*******************************Seller-panel SELLER PATCH requests*********************************************
 
 //update seller info
+//TODO:: Figure out how to switch out logo file in s3 bucket and update key for it
 router.patch("/:sellerId", (req, res, next) => {
   const id = req.params.sellerId;
   const updateOps = {};
   for (const ops of req.body) {
     updateOps[ops.propName] = ops.value;
   }
-  if(updateOps.propName === "")
+
+  //TODO:: persist updates from seller customer service info to product customer service info
+  //if(updateOps.propName === "")
+
+
   console.log(updateOps)
   Seller.updateOne({ _id: id }, {$set: updateOps}, {upsert: true, new: true})
     .exec()
@@ -170,31 +174,83 @@ router.patch("/:sellerId", (req, res, next) => {
 
 //*******************************Seller-panel SELLER DELETE requests*********************************************
 
-router.delete("/:sellerId", (req, res, next) => {
+router.delete("/:sellerId", async (req, res, next) => {
     const id = req.params.sellerId;
-    Product.find({'seller.brand_id': id}).deleteMany()
+    let keysToDelete = [{"Key": ''}]
+  
+    var params = {
+      Bucket: process.env.AWS_BUCKET_NAME, 
+      Delete: {
+        Objects: [{
+            Key: ''
+        }],
+        Quiet: false
+      },
+    }
+    let count = 0
+
+    Seller.findById(id).select('numOfProducts brandLogo')
     .exec()
-    .then(result => {
-      console.log("All of this sellers products have been deleted" + result)
-    })
-    Seller.deleteOne({ _id: id })
+    .then( async result =>{
+
+      keysToDelete[count] = {
+        Key: result.brandLogo
+      } 
+      count++
+      
+      //Collects keys from deleted products
+      for(i = 0; i <= result.numOfProducts -1; i++){
+        const data = await Product.findOneAndDelete({'seller.brand_id': id})
+        .exec()
+        .then(deletedDoc =>{
+          return deletedDoc
+        }).catch(err => {console.log(err);})
+
+        keysToDelete[count] = { 
+          "Key": data.productImage
+        }
+        count++
+        for(j = 0; j <= data.colorway.length -1; j++){
+          
+          keysToDelete[count] = {
+            "Key": data.colorway[j].model
+          }
+          count++
+        }
+    } //end of for loop
+
+      //Deletes seller
+      Seller.deleteOne({_id: id})
       .exec()
-      .then(result => {
-        res.status(200).json({
-            message: 'Seller Deleted',
-            request: {
-                type: 'POST',
-                url: 'http://localhost:5000/seller',
-                body: { result }
-            }
-        });
+      .then(deleteSellerResult =>{
+        console.log(deleteSellerResult)
       })
       .catch(err => {
         console.log(err);
-        res.status(500).json({
-          error: err
-        });
+      })
+
+      return keysToDelete
+    })// end of seller.findbyid .then
+    .then(keys => {
+      //sends keys to params to delete
+      params.Delete.Objects = keys
+
+      //deletes keys in s3 bucket
+      s3.deleteObjects(params, function(err, data) {
+        if (err){console.log(err, err.stack)} // an error occurred
+        else {console.log(data)}           // successful response
       });
+
+      res.status(200).json({
+        message: 'Seller\'s account and all products have been deleted from DB and S3',
+      });
+    })
+    .catch(err => {
+      console.log(err);
+      res.status(500).json({
+        Error: err
+      });
+    });
 });
 
 //******************************************************************************************************************

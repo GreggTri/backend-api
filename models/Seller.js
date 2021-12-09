@@ -30,7 +30,10 @@ const SellerSchema = new mongoose.Schema({
         accNumber: {type: String},
         routingNumber: {type: String}
     },
-    isVerified: {type: Boolean, default: false}
+    isVerified: {type: Boolean, default: false},
+    numOfProducts: {type: Number, required: true, default: 0},
+    connect_stripe_id: {type: String},
+    stripe_seller_customerId: {type: String}
 
 }, {timestamps: true} )
 

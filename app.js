@@ -3,19 +3,33 @@ const app = express()
 const mongoose = require('mongoose')
 const logger = require('morgan')
 require ('dotenv').config()
-const bodyParser = require('body-parser')
 
 //import routes
 const sellerRoute = require('./routes/sellers')
 const productRoute = require('./routes/products')
+const stripeRoute = require('./routes/stripe')
+const orderRoute = require('./routes/orders')
+const userRoute = require('./routes/users')
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
 app.use(logger('dev'))
+app.use((req, res, next) =>{
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000')
+  res.header('Access-Control-Allow-Headers', '*')
+  if(req.method === 'OPTIONS'){
+    res.header('Access-Control-Allow-Methods', 'PUT, POST, PATH, DELETE, GET')
+    return res.status(200).json({})
+  }
+  next();
+})
 
 //routes
 app.use('/seller', sellerRoute)
 app.use('/product', productRoute)
+app.use('/stripe', stripeRoute)
+app.use('/order', orderRoute)
+app.use('/user', userRoute)
 
 //error handling
 app.use((req, res, next) =>{

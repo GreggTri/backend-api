@@ -40,14 +40,16 @@ router.get("/", (req, res, next) => {
 //******************************************POST requests*******************************************************
 
 router.post("/", (req, res, next) =>{
+    fullName = req.body.fName
+    let name = fullName.split('\\s+')
     const user = new User({
-        firstName: req.body.firstName,
-        lastName: req.body.lastName,
+        firstName: name[0],
+        lastName: name[1],
         email: req.body.email,
         password: req.body.password,
     })
-    console.log(seller)
-    seller.save().then(result =>{
+    console.log(user)
+    user.save().then(result =>{
         console.log(result)
         res.status(201).json({
             message: "User account has been created!",
@@ -79,7 +81,7 @@ router.patch("/:userId", (req, res, next) => {
     for (const ops of req.body) {
       updateOps[ops.propName] = ops.value;
     }
-    Seller.updateOne({ _id: id }, {$set: updateOps}, {upsert: true, new: true})
+    User.updateOne({ _id: id }, {$set: updateOps}, {upsert: true, new: true})
       .exec()
       .then(result => {
         res.status(200).json({
