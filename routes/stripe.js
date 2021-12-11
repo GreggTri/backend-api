@@ -133,7 +133,7 @@ router.post('/create-seller-customer', async (req, res) => {
       })
       .catch(err => {
         console.log(err)
-      })
+      }) 
     }
     else{
       console.log("seller already has customer id")
@@ -168,7 +168,7 @@ router.post('/customer-portal', async (req, res) => {
   })
 });
 
-router.post("/webhook", async (req, res) => {
+router.post("/subscription/webhook", async (req, res) => {
   let data;
   let eventType;
   // Only verify the event if you have an endpoint secret defined.
@@ -205,13 +205,18 @@ router.post("/webhook", async (req, res) => {
       // Store the status in your database and check when a user accesses your service.
       // This approach helps you avoid hitting rate limits.
       break;
-    case 'invoice.payment_failed':
+    case 'invoice.payment_failed': 
       // The payment failed or the customer does not have a valid payment method.
       // The subscription becomes past_due. Notify your customer and send them to the
       // customer portal to update their payment information.
       break;
+    case 'invoice.upcoming':
+      //check for numOfProducts for seller's upcoming invoice and change the quantity of subscription
+      //for such invoice
+      break;
     default:
-    // Unhandled event type
+      // Unhandled event type
+      res.status(400).end()
   }
 
   // Return a 200 response to acknowledge receipt of the event

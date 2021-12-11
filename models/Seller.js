@@ -6,13 +6,6 @@ const SellerSchema = new mongoose.Schema({
     ownerName: {type: String, required: true},
     email: { type: String, required: true, unique: true},
     password: { type: String, required: true},
-    EIN: {type: String, required: true, unique: true},
-    cards: [{
-        fullName: {type: String}, 
-        number:{type: String },
-        exp_date: {type: String},
-        cvv: {type: Boolean, default: false}
-    }],
     customerService: {
         email: {type: String},
         phoneNumber:{type: String },

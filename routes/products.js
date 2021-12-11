@@ -255,11 +255,7 @@ router.patch("/:productId", (req, res, next) => {
     .exec()
     .then(result => {
       res.status(200).json({
-          message: 'Product updated',
-          request: {
-              type: 'GET',
-              url: 'http://localhost:3000/products/' + id
-          }
+          message: `Product ${result.id} updated with name ${result.productName}`
       });
     })
     .catch(err => {

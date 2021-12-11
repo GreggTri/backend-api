@@ -1,6 +1,6 @@
 const express = require('express')
 const router = express.Router()
-
+const bcrypt = require('bcrypt')
 const User = require('../models/User')
 
 //**************************************GET requests*********************************************************
@@ -39,38 +39,58 @@ router.get("/", (req, res, next) => {
 
 //******************************************POST requests*******************************************************
 
-router.post("/", (req, res, next) =>{
-    fullName = req.body.fName
-    let name = fullName.split('\\s+')
-    const user = new User({
-        firstName: name[0],
-        lastName: name[1],
-        email: req.body.email,
-        password: req.body.password,
-    })
-    console.log(user)
-    user.save().then(result =>{
-        console.log(result)
-        res.status(201).json({
-            message: "User account has been created!",
-            createdSeller: {
-                _id: result._id,
-                firstName: result.firstName,
-                lastName: result.lastName,
-                email: result.email,
-                request: {
-                    type: 'GET',
-                    url:"http://localhost:5000/user/" + result._id
-                }
-            }
+router.post('/login', async (req, res, next) =>{
+    try{
+        let user = await User.findOne({email: req.body.email}).exec()
+        console.log(user)
+        if(user == null){
+            return res.status(400).send("Wrong email or password. Please try again")
+        }
+
+        if(await bcrypt.compare(req.body.password, user.password)){
+            res.status(200).send('You have Successfully logged in!')
+        }else{
+            res.status(400).send('Wrong email or password. Please try again')
+        }
+    }catch(err){
+        res.status(500).send(`${err}`)
+    }
+})
+
+router.post("/", async (req, res, next) =>{
+    console.log(req.body)
+    try{
+        if(req.body.password !== req.body.confirmPassword){
+            
+            return res.status(400).send('Passwords do not match! Please try again')
+        }
+        const hashedPassword = await bcrypt.hash(req.body.password, 10)
+        console.log(hashedPassword)
+        const user = new User({
+            firstName: req.body.firstName,
+            lastName: req.body.lastName,
+            email: req.body.email,
+            password: hashedPassword,
         })
-    })
-    .catch(err =>{
-        console.log(err)
-        res.status(500).json({
-            error: err
+        
+        console.log(user)
+
+        user.save()
+        .then(result =>{
+            console.log(result)
+            res.status(201).json({
+                message: "User account has been created!"
+            })
         })
-    })
+        .catch(err =>{
+            console.log(err)
+            res.status(500).json({
+                error: err
+            })
+        })
+    }catch(err){
+        res.status(500).send(`${err}`)
+    }
 })
 
 //*****************************************PATCH requests*******************************************************

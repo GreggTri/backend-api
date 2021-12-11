@@ -9,6 +9,7 @@ const Seller = require('../models/Seller')
 const Product = require('../models/Product')
 const path = require('path')
 const { s3 } = require('../s3')
+const bcrypt = require('bcrypt')
 
 var uploadBrandLogo = multer({
   storage: multerS3({
@@ -92,22 +93,43 @@ router.get("/:sellerId", (req, res, next) => {
         console.log(err);
         res.status(500).json({ error: err });
       });
-  });
+});
+
 
 //*******************************Seller-panel SELLER POST requests********************************************
 
-router.post("/", uploadBrandLogo, (req, res, next) => {
+router.post('/login', async (req, res, next) =>{
+  try{
+    let seller = await Seller.findOne({email: req.body.email}).exec()
 
-  const seller = new Seller({
+    if(seller === null || seller === undefined){
+      return res.status(400).send("Wrong email or password. Please try again")
+
+    }else{
+
+      if(await bcrypt.compare(req.body.password, seller.password)){
+        res.status(200).send('You have Successfully logged in!')
+      }else{
+        res.status(400).send('Wrong email or password. Please try again')
+      }
+    }
+  }catch(err){
+    res.status(500).send(`${err}`)
+  }
+})
+
+router.post("/", uploadBrandLogo, async (req, res, next) => {
+
+  try{
+    const hashedPassword = await bcrypt.hash(req.body.password, 10)
+    const seller = new Seller({
       brandLogo: req.file.key,
       brandName: req.body.brandName,
       ownerName: req.body.ownerName,
       email: req.body.email,
-      password: req.body.password,
-      EIN: req.body.EIN
-  })
-  
-  seller.save().then(result =>{
+      password: hashedPassword
+    })
+    seller.save().then(result =>{
       console.log(result)
       res.status(201).json({
           message: "Seller account has been created!",
@@ -132,6 +154,9 @@ router.post("/", uploadBrandLogo, (req, res, next) => {
           error: err
       })
   })
+  }catch(err){
+    res.status(500).send(error)
+  }
 })
     
     
