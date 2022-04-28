@@ -279,9 +279,33 @@ router.delete("/:sellerId", async (req, res, next) => {
 });
 
 //******************************************************************************************************************
-//*************************************APP CLIENT SELLER GET REQUESTS***********************************************
+//*************************************APP CLIENT SELLER REQUESTS***********************************************
 //******************************************************************************************************************
 
+router.get("/popular-brands", async (req,res, next) =>{
+    
+    try{
+       response = await Seller.find({"isVerified": true}).limit(10).select("_id brandLogo brandName customerService numOfProducts").exec()
+       res.status(200).json(response)
+    } catch(error){
+        res.status(500).json(error);
+    }
+})
 
+router.get("/get-brand", async (req,res, next) =>{
+    
+    try{
+       brand = await Seller.findOne(req.body.brandName).select("_id brandLogo brandName customerService numOfProducts")
+
+       if(brand === null){
+        res.status(404).json("Brand does not exist")
+       } else {
+        res.status(200).json(brand)
+       }
+       
+    } catch(error){
+        res.status(500).json(error);
+    }
+})
 
 module.exports = router
