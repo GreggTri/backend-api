@@ -7,6 +7,9 @@ const { v4 } = require('uuid')
 const uuid = v4
 const Product = require("../models/Product")
 const Seller = require('../models/Seller')
+const Review = require('../models/Review');
+const User = require("../models/User");
+
 const path = require('path')
 const { s3 } = require('../s3')
 
@@ -32,39 +35,6 @@ var  uploadProduct = multer({
 //******************************************************************************************************************
 //*********************************Seller-panel PRODUCT GET requests*********************************************
 //******************************************************************************************************************
-
-//GET ALL Products
-//TODO**
-router.get("/", (req, res, next) => {
-  Product.find()
-    .select("_id productImage productName price desc")
-    .exec()
-    .then(docs => {
-      const response = {
-        count: docs.length,
-        products: docs.map(doc => {
-          return {
-            productImage: doc.productImage,
-            productName: doc.productName,
-            desc: doc.desc,
-            price: doc.price,
-            _id: doc._id,
-            request: {
-              type: "GET",
-              url: "http://localhost:3000/products/" + doc._id
-            }
-          };
-        })
-      };
-      res.status(200).json(response);
-    })
-    .catch(err => {
-      console.log(err);
-      res.status(500).json({
-        error: err
-      });
-    });
-});
 
 //GET singular Product **CAN ALSO BE USED FOR APP CLIENT**
 //TODO**
@@ -333,12 +303,108 @@ router.delete("/:productId", async (req, res, next) => {
 });
 
 //******************************************************************************************************************
-//*************************************APP CLIENT PRODUCT GET REQUESTS**********************************************
+//*************************************APP CLIENT PRODUCT REQUESTS**********************************************
 //******************************************************************************************************************
 
-//TODO: get products that were most recently added
+//get all products from a seller
+  router.get("/list-all/:sellerId", (req, res, next) => {
+    const id = req.params.sellerId;
+    Product.find({'seller._id': id})
+    .select('_id productImage productName price desc category colorway seller countInStock')
+    .exec()
+    .then(docs => {
+      const response = {
+        count: docs.length,
+         
+        message: 'All of a sellers products',
+        products: docs.map(doc => {
+          return {
+            _id: doc._id,
+            productImage: doc.productImage,
+            productName: doc.productName,
+            price: doc.price,
+            category: doc.category,
+            desc: doc.desc,
+            colorway: doc.colorway,
+            Seller: doc.seller.brandName,
+          };
+        })
+      };
+      console.log(docs)
+      res.status(200).json(docs);
+    })
+      .catch(err => {
+        console.log(err);
+        res.status(500).json({ error: err });
+      });
+  });
 
-//TODO: get products that are most purchased
+router.get('get-reviews', async (req, res, next) => {
+    let productId = req.body.productId
+    
+    try{
 
-//perform search query for products
+        let reviews = await Review.find({product: productId}).select('_id product reviewDate userFirstName userLastName content rating')
+
+        res.status(200).json(reviews);
+
+    }catch(error){
+
+      res.status(500).json(error)
+    }
+  })
+
+  router.get("/newest-products", (req, res, next) => {
+    Product.find({'seller.isVerified': true}).sort({_id: 1}).limit(10)
+    .select("_id productImage productName desc category price countInStock colorway seller")
+    .exec()
+    .then(docs =>{
+        const response = {
+            products: docs.map(doc => {
+              return {
+                _id: doc._id,
+                productImage: doc.productImage,
+                productName: doc.productName,
+                price: doc.price,
+                category: doc.category,
+                desc: doc.desc,
+                colorway: doc.colorway,
+                Seller: doc.seller,
+                Stock: doc.countInStock
+              };
+            })
+        };
+        res.status(200).json(docs);
+    })
+    .catch(err => {
+        console.log(err);
+        res.status(500).json({ error: err });
+    })
+  })
+
+
+  router.post('/add-reviews', async (req, res, next) => {
+    try{
+
+      let user = await User.findById(req.body.userId).select('firstName lastName')
+
+      const review = new Review({
+        product: req.body.productId,
+        user: req.body.userId,
+        userFirstName: user.firstName,
+        userLastName: user.LastName,
+        content: req.body.reviewContent,
+        stars: req.body.rating
+      })
+
+      await review.save()
+
+      res.status(201).json("your review has been created")
+
+    }catch(error){
+      console.log(error);
+      res.status(500).json(error);
+    }
+  })
+
 module.exports = router;
