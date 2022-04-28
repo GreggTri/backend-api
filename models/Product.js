@@ -7,9 +7,10 @@ const ProductSchema = new mongoose.Schema({
     category: { type: String, required: true},
     price: { type: String, required: true},
     seller: {
-        brand_id: {type: mongoose.Schema.Types.ObjectId, ref: 'Seller'},
+        _id: {type: mongoose.Schema.Types.ObjectId, ref: 'Seller'},
         brandLogo: {type: String},
         brandName: {type: String},
+        isVerified: {type: Boolean, default: false},
         customerService: {
             email: {type: String},
             phoneNumber: {type: String },
