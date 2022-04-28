@@ -1,7 +1,7 @@
 const mongoose = require('mongoose')
 
 const UserSchema = new mongoose.Schema({
-    firstName: {type: String, require: true},
+    firstName: {type: String, required: true},
     lastName: { type: String, required: true},
     email: { type: String, required: true, unique: true},
     password: { type: String, required: true},
@@ -13,10 +13,10 @@ const UserSchema = new mongoose.Schema({
         cvv: {type: Boolean, default: false},
     }],
     address: {
-        street: {type: String},
-        city:{type: String},
-        state: {type: String},
-        zipcode: {type: String},
+        street: {type: String, default: ""},
+        city:{type: String, default: ""},
+        state: {type: String, default: ""},
+        zipcode: {type: String, default: ""},
     },
     favorites: [{
         product_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Product'}
